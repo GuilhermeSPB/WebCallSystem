@@ -15,8 +15,12 @@ const servers = {
 
 // Inicia a conexão com o Hub
 async function start() {
-    await connection.start();
-    console.log("Conexão Bem-Sucedida");
+    if (connection.state === signalR.HubConnectionState.Disconnected) {
+        await connection.start();
+        console.log("Conexão Bem-Sucedida");
+    } else {
+        console.warn("Conexão já está inciada");
+    }
 }
 
 // Quando um usuário entra
@@ -107,7 +111,11 @@ function createPeer(userId) {
 
     // Quando recebe a stream de vídeo do outro usuário
     ponto.ontrack = event => {
-        document.getElementById("remoteVideo").srcObject = event.streams[0];
+        const remoteVideo = document.getElementById("remoteVideo");
+        if (remoteVideo.srcObject !== event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            console.log("Recebida stream remota de:", userId);
+        }
     };
 
     // Adiciona as faixas locais (áudio/vídeo) ao ponto

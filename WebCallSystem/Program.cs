@@ -8,7 +8,7 @@ builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin();
+        policy.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(_ => true);
     });
 });
 
@@ -17,6 +17,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseCors();
 
-app.MapHub<CallHub>("/callHub");
+app.MapHub<CallHub>("/webcallHub");
 
 app.Run();

@@ -5,10 +5,20 @@
     <title>WebCall</title>
 </head>
 <body>
-    <h2>WebCall - Sala Única</h2>
-    <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
-    <button id="joinBtn">Entrar na Sala</button>
+    <div id="videoContainer" style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
+        <div style="text-align: center;">
+            <h3>Você</h3>
+            <video id="localVideo" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
+        </div>
+        <div style="text-align: center;">
+            <h3>Outro usuário</h3>
+            <video id="remoteVideo" autoplay playsinline style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
+        </div>
+    </div>
+
+    <div style="text-align:center; margin-top:20px;">
+        <button id="joinBtn" style="padding: 10px 20px; border-radius: 6px;">Entrar na Chamada</button>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <script src="script.js"></script>
