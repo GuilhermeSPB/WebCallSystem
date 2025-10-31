@@ -4,6 +4,8 @@ namespace WebCallSystem
 {
     public class CallHub : Hub
     {
+        private static Dictionary<string, string> connectedUsers = new Dictionary<string, string>();
+
 
         //Enviado do usuário que inicia a call para o outro usuário
         public async Task SendOffer(string targetId, string offer)
@@ -25,7 +27,18 @@ namespace WebCallSystem
 
         public async Task JoinCall()
         {
-            await Clients.Others.SendAsync("UserJoined", Context.ConnectionId);
+            var connectionId = Context.ConnectionId;
+
+            
+            connectedUsers[connectionId] = connectionId;
+
+            
+            await Clients.Others.SendAsync("UserJoined", connectionId);
+
+            
+            var connectedUserList = connectedUsers.Keys.Where(u => u != connectionId).ToList();
+            await Clients.Caller.SendAsync("ConnectedUsers", connectedUserList);
+
         }
 
         public override async Task OnDisconnectedAsync(Exception? ex)

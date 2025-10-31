@@ -25,24 +25,30 @@ async function start() {
 
 // Quando um usuário entra
 connection.on("UserJoined", async (userId) => {
-    console.log("Usuário Entrou: ", userId);
+    connection.on("UserJoined", async (userId) => {
+    console.log("Usuário entrou:", userId);
+    criarVideoRemoto(userId);
+});
+});
 
-    try {
-        if (peerConnections[userId]) {
-            console.warn("User joined - Ponto já existe para:", userId);
-            return;
-        }
+connection.on("ConnectedUsers", async function (connectedUserList) {
+    console.log("Usuários já conectados:", connectedUserList);
 
-        var ponto = criarPonto(userId); // Cria o ponto (PeerConnection) associado ao userId
+    for (const userId of connectedUserList) {
+        // Cria uma conexão P2P para cada usuário já conectado
+        const ponto = criarPeerConnection(userId);
+        peers[userId] = ponto;
 
-        const offer = await ponto.createOffer(); // cria oferta (descrição geral de funcionamento do ponto)
-        await ponto.setLocalDescription(offer); // define a descrição local do ponto
+        // Adiciona o vídeo remoto (para exibir quando o stream chegar)
+        criarVideoRemoto(userId);
 
-        await connection.invoke("SendOffer", userId, JSON.stringify(offer)); // envia oferta em forma de JSON para o outro usuário
-        console.log("Oferta enviada para:", userId);
+        // Cria a oferta (offer) para iniciar a conexão
+        const offer = await ponto.createOffer();
+        await ponto.setLocalDescription(offer);
 
-    } catch (err) {
-        console.error("Erro ao tentar criar ponto do userId: " + userId + " ou enviar oferta | " + err);
+        // Envia a offer para o outro usuário via SignalR
+        await connection.invoke("SendOffer", userId, JSON.stringify(offer));
+        console.log("Offer enviada para:", userId);
     }
 });
 
@@ -61,7 +67,14 @@ connection.on("ReceiveOffer", async (userId, offer) => {
         const anwser = await ponto.createAnswer(); // cria a resposta
         await ponto.setLocalDescription(anwser); // define a descrição local da resposta
 
-        await connection.invoke("SendAnswer", userId, JSON.stringify(anwser)); // envia a resposta para o outro usuário
+        if (pendingCandidates[userId]) {
+            for (const c of pendingCandidates[userId]) {
+                try { await ponto.addIceCandidate(c); } catch { }
+            }
+            delete pendingCandidates[userId];
+        }
+
+        await connection.invoke("SendAnswer", userId, JSON.stringify(anwser));
         console.log("Resposta enviada para:", userId);
 
     } catch (err) {
@@ -83,14 +96,21 @@ connection.on("ReceiveAnswer", async (userId, answer) => {
 });
 
 // recebe os candidatos ICE (endereços de rede)
+
+let pendingCandidates = {};
+
 connection.on("ReceiveIceCandidate", async (userId, candidateJson) => {
     const ponto = peerConnections[userId];
-    if (!ponto) {
-        console.error("Receber Ice - Ponto não encontrado para:", userId);
+    const candidate = new RTCIceCandidate(JSON.parse(candidateJson));
+
+    if (!ponto || !ponto.remoteDescription) {
+        // Guarda temporariamente
+        if (!pendingCandidates[userId]) pendingCandidates[userId] = [];
+        pendingCandidates[userId].push(candidate);
         return;
     }
+
     try {
-        const candidate = new RTCIceCandidate(JSON.parse(candidateJson));
         await ponto.addIceCandidate(candidate);
         console.log("ICE Candidate adicionado para:", userId);
     } catch (err) {
@@ -111,15 +131,19 @@ function createPeer(userId) {
 
     // Quando recebe a stream de vídeo do outro usuário
     ponto.ontrack = event => {
-        const remoteVideo = document.getElementById("remoteVideo");
-        if (remoteVideo.srcObject !== event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
+        const $remoteVideo = $(`#remoteVideo-${userId}`);
+        if ($remoteVideo.prop('srcObject') !== event.streams[0]) {
+            $remoteVideo.prop('srcObject', event.streams[0]);
             console.log("Recebida stream remota de:", userId);
         }
     };
 
     // Adiciona as faixas locais (áudio/vídeo) ao ponto
-    localStream.getTracks().forEach(track => ponto.addTrack(track, localStream));
+    if (localStream) {
+        localStream.getTracks().forEach(track => ponto.addTrack(track, localStream));
+    } else {
+        console.warn("localStream ainda não está definido ao criar peer de", userId);
+    }
 
     return ponto;
 }
@@ -132,10 +156,60 @@ function criarPonto(userId) {
 }
 
 // Evento de clique para entrar na chamada
-document.getElementById("joinBtn").addEventListener("click", async () => {
+$('#joinBtn').click(async function () {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     document.getElementById("localVideo").srcObject = localStream;
 
     await start(); // inicia a conexão SignalR
     await connection.invoke("JoinCall"); // notifica o servidor que entrou
+});
+
+
+function modalShow() {
+    let username = "";
+
+    $('#usernameModal').modal('show');
+
+    $('#confirmUsername').click(function () {
+        const inputName = $('#modalUsername').val().trim();
+
+        if (inputName) {
+            username = inputName;
+            $('#usernameModal').modal('hide');
+
+            //connection.start()
+            //    .then(function () {
+            //        connection.invoke("RegisterUser", username);
+            //    })
+            //    .catch(function (err) {
+            //        console.error(err.toString());
+            //    });
+                $("#userNameLabel").text(username);
+
+        } else {
+            alert("Por favor, insira um nome");
+        }
+
+    });
+}
+
+
+function criarVideoRemoto(userId) {
+    // evita duplicatas
+    if ($(`#remoteContainer-${userId}`).length) return;
+
+    const $div = $(`
+        <div id="remoteContainer-${userId}" style="text-align: center;">
+            <h3>Usuário: ${userId}</h3>
+            <video id="remoteVideo-${userId}" autoplay playsinline
+                style="width: 320px; height: 240px; border-radius: 12px; background: #000;">
+            </video>
+        </div>
+    `);
+
+    $('#videoContainer').append($div);
+}
+
+$(document).ready(function () {
+    modalShow();
 });

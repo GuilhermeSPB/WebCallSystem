@@ -3,17 +3,41 @@
 <head>
     <meta charset="utf-8">
     <title>WebCall</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
-    <div id="videoContainer" style="display: flex; justify-content: center; gap: 20px; margin-top: 30px;">
-        <div style="text-align: center;">
-            <h3>Você</h3>
-            <video id="localVideo" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
+
+    <div class="modal fade" id="usernameModal" tabindex="-1" role="dialog" aria-labelledby="usernameModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" style="color:black" id="usernameModalLabel">Bem-vindo!</h5>
+                </div>
+                <div style="color:black" class="modal-body">
+                    <p>Digite seu nome para entrar:</p>
+                    <input type="text" id="modalUsername" class="form-control" placeholder="Seu nome">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="confirmUsername" class="btn btn-primary">Entrar</button>
+                </div>
+            </div>
         </div>
-        <div style="text-align: center;">
-            <h3>Outro usuário</h3>
-            <video id="remoteVideo" autoplay playsinline style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
-        </div>
+    </div>
+
+    <div class="container"> 
+        <div class="row" style="margin-top:20px">
+            <div id="videoContainer" class="col-sm-12" style="display: flex; justify-content: center">
+
+                <div style="text-align: center;" class="col-sm-4">
+                    <h3 id="userNameLabel"></h3>
+                    <video id="localVideo" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
+                </div>
+
+            </div>
+         </div>
     </div>
 
     <div style="text-align:center; margin-top:20px;">
