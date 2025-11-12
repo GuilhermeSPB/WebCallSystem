@@ -6,35 +6,41 @@ let localStream;
 let peerConnections = {};
 let secondUserId;
 
-// Configuração dos servidores STUN (para descoberta de IPs públicos)
+
 const servers = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" }
     ]
 };
 
-// Inicia a conexão com o Hub
+
 async function start() {
-    if (connection.state === signalR.HubConnectionState.Disconnected) {
-        await connection.start();
-        console.log("Conexão Bem-Sucedida");
-    } else {
-        console.warn("Conexão já está inciada");
+
+    try {
+        if (connection.state != signalR.HubConnectionState.Connected) {
+            await connection.start();
+            var usuarios = await connection.invoke("Registrar");
+            console.log("Usuários já conectados:", usuarios);
+        } else {
+            console.warn("Conexão já iniciada");         
+        }
+    } catch (e) {
+        console.log("Erro ao iniciar conexão SignalR: ", e);
     }
 }
 
-// Quando um usuário entra
-connection.on("UserJoined", async (userId) => {
-    connection.on("UserJoined", async (userId) => {
+
+connection.on("UsuarioEntrou", async (userId) => {
     console.log("Usuário entrou:", userId);
+
     criarVideoRemoto(userId);
 });
-});
 
-connection.on("ConnectedUsers", async function (connectedUserList) {
-    console.log("Usuários já conectados:", connectedUserList);
 
-    for (const userId of connectedUserList) {
+connection.on("UsuariosConectados", async function (usuarioConectados) {
+
+
+    for (const userId of usuarioConectados) {
         // Cria uma conexão P2P para cada usuário já conectado
         const ponto = criarPeerConnection(userId);
         peers[userId] = ponto;
@@ -47,13 +53,13 @@ connection.on("ConnectedUsers", async function (connectedUserList) {
         await ponto.setLocalDescription(offer);
 
         // Envia a offer para o outro usuário via SignalR
-        await connection.invoke("SendOffer", userId, JSON.stringify(offer));
+        await connection.invoke("EnviarOferta", userId, JSON.stringify(offer));
         console.log("Offer enviada para:", userId);
     }
 });
 
 // recebe oferta
-connection.on("ReceiveOffer", async (userId, offer) => {
+connection.on("ReceberOferta", async (userId, offer) => {
 
     try {
         if (peerConnections[userId]) {
@@ -74,7 +80,7 @@ connection.on("ReceiveOffer", async (userId, offer) => {
             delete pendingCandidates[userId];
         }
 
-        await connection.invoke("SendAnswer", userId, JSON.stringify(anwser));
+        await connection.invoke("EnviarResposta", userId, JSON.stringify(anwser));
         console.log("Resposta enviada para:", userId);
 
     } catch (err) {
@@ -83,7 +89,7 @@ connection.on("ReceiveOffer", async (userId, offer) => {
 });
 
 // recebe a resposta (answer)
-connection.on("ReceiveAnswer", async (userId, answer) => {
+connection.on("ReceberResposta", async (userId, answer) => {
 
     const ponto = peerConnections[userId];
 
@@ -99,7 +105,7 @@ connection.on("ReceiveAnswer", async (userId, answer) => {
 
 let pendingCandidates = {};
 
-connection.on("ReceiveIceCandidate", async (userId, candidateJson) => {
+connection.on("ReceberCandidato", async (userId, candidateJson) => {
     const ponto = peerConnections[userId];
     const candidate = new RTCIceCandidate(JSON.parse(candidateJson));
 
@@ -125,7 +131,7 @@ function createPeer(userId) {
     // Quando o navegador descobre um novo candidato ICE
     ponto.onicecandidate = event => {
         if (event.candidate) {
-            connection.invoke("SendIceCandidate", userId, JSON.stringify(event.candidate));
+            connection.invoke("EnviarCandidato", userId, JSON.stringify(event.candidate));
         }
     };
 
@@ -161,7 +167,7 @@ $('#joinBtn').click(async function () {
     document.getElementById("localVideo").srcObject = localStream;
 
     await start(); // inicia a conexão SignalR
-    await connection.invoke("JoinCall"); // notifica o servidor que entrou
+    await connection.invoke("InciarCall"); // notifica o servidor que entrou
 });
 
 
