@@ -2,7 +2,8 @@
     .withUrl("/webcallHub")
     .build();
 
-let localStream;
+let local;
+let localUser;
 let peerConnections = {};
 let secondUserId;
 
@@ -30,31 +31,32 @@ async function start() {
 }
 
 
-connection.on("UsuarioEntrou", async (userId) => {
-    console.log("Usuário entrou:", userId);
+connection.on("UsuariosConectados", async (userId) => {
+    localUser = userId;
+    try {
+        usuarios = await connection.invoke("ListarUsuarios")
+        for(var item in usuarios) {
 
-    criarVideoRemoto(userId);
-});
+            // Cria uma conexão P2P para cada usuário já conectado
+            if (!peerConnections[item]) {
+               var ponto = createPeer(item);
+            }
 
+            // Adiciona o vídeo remoto (para exibir quando o stream chegar)
+            if (item != localUser)
+            criarVideoRemoto(userId);
 
-connection.on("UsuariosConectados", async function (usuarioConectados) {
+            // Cria a oferta (offer) para iniciar a conexão
+            const oferta = await ponto.createOffer();
+            await ponto.setLocalDescription(oferta);
 
+            // Envia a offer para o outro usuário via SignalR
+            await connection.invoke("EnviarOferta", userId, JSON.stringify(oferta));
+            console.log("Offer enviada para:", userId);
+        }
 
-    for (const userId of usuarioConectados) {
-        // Cria uma conexão P2P para cada usuário já conectado
-        const ponto = criarPeerConnection(userId);
-        peers[userId] = ponto;
-
-        // Adiciona o vídeo remoto (para exibir quando o stream chegar)
-        criarVideoRemoto(userId);
-
-        // Cria a oferta (offer) para iniciar a conexão
-        const offer = await ponto.createOffer();
-        await ponto.setLocalDescription(offer);
-
-        // Envia a offer para o outro usuário via SignalR
-        await connection.invoke("EnviarOferta", userId, JSON.stringify(offer));
-        console.log("Offer enviada para:", userId);
+    } catch (e) {
+        console.log("Erro ao tentar criar ponto" , e)
     }
 });
 
@@ -67,6 +69,7 @@ connection.on("ReceberOferta", async (userId, offer) => {
             return;
         }
 
+        console.log("Aqui eu entrei no caminho ReceberOferta");
         var ponto = criarPonto(userId); // Cria ponto para este userId
 
         await ponto.setRemoteDescription(JSON.parse(offer)); // define a descrição recebida do outro ponto como remota
@@ -150,21 +153,22 @@ function createPeer(userId) {
     } else {
         console.warn("localStream ainda não está definido ao criar peer de", userId);
     }
-
+    peerConnections[userId] = ponto;
     return ponto;
+    
 }
 
-// Cria e registra o ponto (peer) no dicionário
-function criarPonto(userId) {
-    const ponto = createPeer(userId); // criar o ponto
-    peerConnections[userId] = ponto; // Registra ponto na array
-    return ponto;
-}
+
 
 // Evento de clique para entrar na chamada
 $('#joinBtn').click(async function () {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    document.getElementById("localVideo").srcObject = localStream;
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+       document.getElementById("localVideo").srcObject = localStream;
+    } catch (e) {
+        console.error("Erro ao acessar câmera/microfone:", e);
+    }
 
     await start(); // inicia a conexão SignalR
     await connection.invoke("InciarCall"); // notifica o servidor que entrou

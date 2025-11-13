@@ -37,7 +37,7 @@ namespace WebCallSystem
 
             
             var connectedUserList = usuarioConectados.Keys.Where(u => u != connectionId).ToList();
-            await Clients.Caller.SendAsync("UsuariosConectados", connectedUserList);
+            await Clients.Caller.SendAsync("UsuariosConectados", connectionId);
 
         }
 
