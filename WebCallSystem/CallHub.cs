@@ -11,7 +11,7 @@ namespace WebCallSystem
         //Enviado do usuário que inicia a call para o outro usuário
         public async Task EnviarOferta(string objetoAlvo, string oferta)
         {
-            await Clients.Client(objetoAlvo).SendAsync("ReceberRespostaOferta", Context.ConnectionId, oferta);
+            await Clients.Client(objetoAlvo).SendAsync("ReceberOferta", Context.ConnectionId, oferta);
         }
 
         //Enviado do usuário que recebe a call para o usuário que iniciou a call
@@ -23,7 +23,7 @@ namespace WebCallSystem
         // Tenta achar a melhor rota de comunicação para alcançar outro usuário.
         public async Task EnviarICE(string objetoAlvo, string candidato)
         {
-            await Clients.Client(objetoAlvo).SendAsync("ReceberCandidato", Context.ConnectionId, candidato);
+            await Clients.Client(objetoAlvo).SendAsync("ReceberICE", Context.ConnectionId, candidato);
         }
 
         public async Task InciarCall()

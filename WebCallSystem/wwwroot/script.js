@@ -23,7 +23,7 @@ async function start() {
             var usuarios = await connection.invoke("Registrar");
             console.log("Usuários já conectados:", usuarios);
         } else {
-            console.warn("Conexão já iniciada");         
+            console.warn("Conexão já iniciada");
         }
     } catch (e) {
         console.log("Erro ao iniciar conexão SignalR: ", e);
@@ -35,53 +35,51 @@ connection.on("UsuariosConectados", async (userId) => {
     localUser = userId;
     try {
         usuarios = await connection.invoke("ListarUsuarios")
-        for(var item in usuarios) {
+        for (var item in usuarios) {
 
             // Cria uma conexão P2P para cada usuário já conectado
-            if (!peerConnections[item]) {
-               var ponto = createPeer(item);
-            }
+
+            var ponto = createPeer(item);
+
 
             // Adiciona o vídeo remoto (para exibir quando o stream chegar)
-            if (item != localUser)
-            criarVideoRemoto(userId);
+            if (item != localUser) {
+                criarVideoRemoto(item);
+                console.warn("criando caixa de usuário para o usuário: ");
 
-            // Cria a oferta (offer) para iniciar a conexão
-            const oferta = await ponto.createOffer();
-            await ponto.setLocalDescription(oferta);
+                // Cria a oferta (offer) para iniciar a conexão
+                const oferta = await ponto.createOffer();
+                await ponto.setLocalDescription(oferta);
 
-            // Envia a offer para o outro usuário via SignalR
-            await connection.invoke("EnviarOferta", userId, JSON.stringify(oferta));
-            console.log("Offer enviada para:", userId);
+                // Envia a offer para o outro usuário via SignalR
+                await connection.invoke("EnviarOferta", item, JSON.stringify(oferta));
+                console.log("Offer enviada para:", item);
+            }
         }
 
     } catch (e) {
-        console.log("Erro ao tentar criar ponto" , e)
+        console.log("Erro ao tentar criar ponto", e)
     }
 });
 
-// recebe oferta
+
 connection.on("ReceberOferta", async (userId, offer) => {
 
     try {
-        if (peerConnections[userId]) {
-            console.warn("Receber Offer - Ponto já existe para:", userId);
-            return;
-        }
-
-        console.log("Aqui eu entrei no caminho ReceberOferta");
-        var ponto = criarPonto(userId); // Cria ponto para este userId
-
+        var ponto = createPeer(userId);
         await ponto.setRemoteDescription(JSON.parse(offer)); // define a descrição recebida do outro ponto como remota
         const anwser = await ponto.createAnswer(); // cria a resposta
         await ponto.setLocalDescription(anwser); // define a descrição local da resposta
 
-        if (pendingCandidates[userId]) {
-            for (const c of pendingCandidates[userId]) {
-                try { await ponto.addIceCandidate(c); } catch { }
-            }
-            delete pendingCandidates[userId];
-        }
+
+        //if (pendingCandidates[userId]) {
+        //    for (const c of pendingCandidates[userId]) {
+        //        try {
+        //            await ponto.addIceCandidate(c);
+        //        } catch (e) { console.log("Erro ao tentar adiciona candidato ICE: ", e) }
+        //    }
+        //    delete pendingCandidates[userId];
+        //}
 
         await connection.invoke("EnviarResposta", userId, JSON.stringify(anwser));
         console.log("Resposta enviada para:", userId);
@@ -108,7 +106,7 @@ connection.on("ReceberResposta", async (userId, answer) => {
 
 let pendingCandidates = {};
 
-connection.on("ReceberCandidato", async (userId, candidateJson) => {
+connection.on("ReceberICE", async (userId, candidateJson) => {
     const ponto = peerConnections[userId];
     const candidate = new RTCIceCandidate(JSON.parse(candidateJson));
 
@@ -120,6 +118,7 @@ connection.on("ReceberCandidato", async (userId, candidateJson) => {
     }
 
     try {
+        criarVideoRemoto(userId);
         await ponto.addIceCandidate(candidate);
         console.log("ICE Candidate adicionado para:", userId);
     } catch (err) {
@@ -129,33 +128,39 @@ connection.on("ReceberCandidato", async (userId, candidateJson) => {
 
 // Cria um peer (ponto de conexão WebRTC)
 function createPeer(userId) {
-    const ponto = new RTCPeerConnection(servers);
+    if (!peerConnections[userId]) {
+        var ponto = new RTCPeerConnection(servers);
 
-    // Quando o navegador descobre um novo candidato ICE
-    ponto.onicecandidate = event => {
-        if (event.candidate) {
-            connection.invoke("EnviarCandidato", userId, JSON.stringify(event.candidate));
+        // Quando o navegador descobre um novo candidato ICE
+        ponto.onicecandidate = event => {
+            if (event.candidate) {
+                connection.invoke("EnviarICE", userId, JSON.stringify(event.candidate));
+            }
+        };
+
+        // Quando recebe a stream de vídeo do outro usuário
+        ponto.ontrack = event => {
+            const $remoteVideo = $(`#remoteVideo-${userId}`);
+            if ($remoteVideo.prop('srcObject') !== event.streams[0]) {
+                $remoteVideo.prop('srcObject', event.streams[0]);
+                console.log("Recebida stream remota de:", userId);
+            }
+        };
+
+        // Adiciona as faixas locais (áudio/vídeo) ao ponto
+        if (localStream) {
+            localStream.getTracks().forEach(track => ponto.addTrack(track, localStream));
+        } else {
+            console.warn("localStream ainda não está definido ao criar peer de", userId);
         }
-    };
+        peerConnections[userId] = ponto;
+        return ponto;
 
-    // Quando recebe a stream de vídeo do outro usuário
-    ponto.ontrack = event => {
-        const $remoteVideo = $(`#remoteVideo-${userId}`);
-        if ($remoteVideo.prop('srcObject') !== event.streams[0]) {
-            $remoteVideo.prop('srcObject', event.streams[0]);
-            console.log("Recebida stream remota de:", userId);
-        }
-    };
-
-    // Adiciona as faixas locais (áudio/vídeo) ao ponto
-    if (localStream) {
-        localStream.getTracks().forEach(track => ponto.addTrack(track, localStream));
     } else {
-        console.warn("localStream ainda não está definido ao criar peer de", userId);
+        var ponto = peerConnections[userId];
+        return ponto;
     }
-    peerConnections[userId] = ponto;
-    return ponto;
-    
+
 }
 
 
@@ -165,7 +170,7 @@ $('#joinBtn').click(async function () {
 
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-       document.getElementById("localVideo").srcObject = localStream;
+        document.getElementById("localVideo").srcObject = localStream;
     } catch (e) {
         console.error("Erro ao acessar câmera/microfone:", e);
     }
@@ -194,7 +199,7 @@ function modalShow() {
             //    .catch(function (err) {
             //        console.error(err.toString());
             //    });
-                $("#userNameLabel").text(username);
+            $("#userNameLabel").text(username);
 
         } else {
             alert("Por favor, insira um nome");
