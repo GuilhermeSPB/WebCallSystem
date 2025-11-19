@@ -20,6 +20,7 @@ async function start() {
     try {
         if (connection.state != signalR.HubConnectionState.Connected) {
             await connection.start();
+            localUser = connection.connectionId;
             var usuarios = await connection.invoke("Registrar");
             console.log("Usuários já conectados:", usuarios);
         } else {
@@ -31,31 +32,31 @@ async function start() {
 }
 
 
-connection.on("UsuariosConectados", async (userId) => {
-    localUser = userId;
+connection.on("UsuariosConectados", async (localUserId) => {
+
     try {
-        usuarios = await connection.invoke("ListarUsuarios")
-        for (var item in usuarios) {
+        const usuarios = await connection.invoke("ListarUsuarios");
 
-            // Cria uma conexão P2P para cada usuário já conectado
+        Object.keys(usuarios).forEach(async (item) => {
 
-            var ponto = createPeer(item);
+            if (item === localUser)
+                return;
 
+            if (!peerConnections[item]) {
+                const ponto = createPeer(item);
+                peerConnections[item] = ponto;
 
-            // Adiciona o vídeo remoto (para exibir quando o stream chegar)
-            if (item != localUser) {
                 criarVideoRemoto(item);
-                console.warn("criando caixa de usuário para o usuário: ");
 
-                // Cria a oferta (offer) para iniciar a conexão
                 const oferta = await ponto.createOffer();
                 await ponto.setLocalDescription(oferta);
 
-                // Envia a offer para o outro usuário via SignalR
                 await connection.invoke("EnviarOferta", item, JSON.stringify(oferta));
                 console.log("Offer enviada para:", item);
+
             }
-        }
+        });
+
 
     } catch (e) {
         console.log("Erro ao tentar criar ponto", e)
@@ -64,28 +65,27 @@ connection.on("UsuariosConectados", async (userId) => {
 
 
 connection.on("ReceberOferta", async (userId, offer) => {
-
     try {
-        var ponto = createPeer(userId);
-        await ponto.setRemoteDescription(JSON.parse(offer)); // define a descrição recebida do outro ponto como remota
-        const anwser = await ponto.createAnswer(); // cria a resposta
-        await ponto.setLocalDescription(anwser); // define a descrição local da resposta
+        let ponto = peerConnections[userId] || createPeer(userId);
 
+        criarVideoRemoto(userId);
 
-        //if (pendingCandidates[userId]) {
-        //    for (const c of pendingCandidates[userId]) {
-        //        try {
-        //            await ponto.addIceCandidate(c);
-        //        } catch (e) { console.log("Erro ao tentar adiciona candidato ICE: ", e) }
-        //    }
-        //    delete pendingCandidates[userId];
-        //}
+        await ponto.setRemoteDescription(JSON.parse(offer));
+        const answer = await ponto.createAnswer();
+        await ponto.setLocalDescription(answer);
 
-        await connection.invoke("EnviarResposta", userId, JSON.stringify(anwser));
+        if (pendingCandidates[userId]) {
+            for (const c of pendingCandidates[userId]) {
+                await ponto.addIceCandidate(c);
+            }
+            delete pendingCandidates[userId];
+        }
+
+        await connection.invoke("EnviarResposta", userId, JSON.stringify(answer));
         console.log("Resposta enviada para:", userId);
 
     } catch (err) {
-        console.error("Erro ao tentar criar ponto do userId: " + userId + " ou enviar resposta | " + err);
+        console.error("Erro ao processar oferta de:", userId, err);
     }
 });
 
@@ -118,7 +118,6 @@ connection.on("ReceberICE", async (userId, candidateJson) => {
     }
 
     try {
-        criarVideoRemoto(userId);
         await ponto.addIceCandidate(candidate);
         console.log("ICE Candidate adicionado para:", userId);
     } catch (err) {
@@ -171,12 +170,13 @@ $('#joinBtn').click(async function () {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         document.getElementById("localVideo").srcObject = localStream;
+
+        await start(); // inicia a conexão SignalR
+        await connection.invoke("InciarCall"); // notifica o servidor que entrou
     } catch (e) {
         console.error("Erro ao acessar câmera/microfone:", e);
     }
-
-    await start(); // inicia a conexão SignalR
-    await connection.invoke("InciarCall"); // notifica o servidor que entrou
+    
 });
 
 

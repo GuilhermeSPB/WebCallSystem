@@ -37,7 +37,7 @@ namespace WebCallSystem
 
             
             var connectedUserList = usuarioConectados.Keys.Where(u => u != connectionId).ToList();
-            await Clients.Caller.SendAsync("UsuariosConectados", connectionId);
+            await Clients.Others.SendAsync("UsuariosConectados", connectionId);
 
         }
 
@@ -58,6 +58,12 @@ namespace WebCallSystem
         public async Task<Dictionary<string, string>> ListarUsuarios()
         {
            return usuarioConectados;
+        }
+
+        public async Task<string> getLocal()
+        {
+            var localId = Context.ConnectionId;
+            return localId;
         }
 
         public override async Task OnDisconnectedAsync(Exception? ex)
