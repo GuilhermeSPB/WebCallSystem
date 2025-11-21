@@ -6,7 +6,7 @@ let local;
 let localUser;
 let peerConnections = {};
 let secondUserId;
-
+let pendingCandidates = {};
 
 const servers = {
     iceServers: [
@@ -104,8 +104,6 @@ connection.on("ReceberResposta", async (userId, answer) => {
 
 // recebe os candidatos ICE (endereços de rede)
 
-let pendingCandidates = {};
-
 connection.on("ReceberICE", async (userId, candidateJson) => {
     const ponto = peerConnections[userId];
     const candidate = new RTCIceCandidate(JSON.parse(candidateJson));
@@ -123,6 +121,10 @@ connection.on("ReceberICE", async (userId, candidateJson) => {
     } catch (err) {
         console.error("Erro ao adicionar ICE Candidate para " + userId + " | " + err);
     }
+});
+
+connection.on("UsuarioSaiu", async (userId) => {
+    $(`#remoteContainer-${userId}`).remove();
 });
 
 // Cria um peer (ponto de conexão WebRTC)
@@ -214,10 +216,9 @@ function criarVideoRemoto(userId) {
     if ($(`#remoteContainer-${userId}`).length) return;
 
     const $div = $(`
-        <div id="remoteContainer-${userId}" style="text-align: center;">
-            <h3>Usuário: ${userId}</h3>
-            <video id="remoteVideo-${userId}" autoplay playsinline
-                style="width: 320px; height: 240px; border-radius: 12px; background: #000;">
+        <div id="remoteContainer-${userId}" style="text-align: center;" <div class="col-xs-12 col-sm-4 text-center">
+            <h3>${userId}</h3>
+            <video id="remoteVideo-${userId}" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;">
             </video>
         </div>
     `);

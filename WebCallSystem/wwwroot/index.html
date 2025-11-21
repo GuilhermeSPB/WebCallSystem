@@ -27,24 +27,23 @@
         </div>
     </div>
 
-    <div class="container"> 
-        <div class="row" style="margin-top:20px">
-            <div id="videoContainer" class="col-sm-12" style="display: flex; justify-content: center">
-
-                <div style="text-align: center;" class="col-sm-4">
+    <div class="container">
+            <div id="videoContainer" style="margin-top:10px" class="row">
+                <div class="col-12 col-sm-4 text-center" style="text-align: center;" <div class="col-xs-12 col-sm-4 text-center">
                     <h3 id="userNameLabel"></h3>
-                    <video id="localVideo" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;"></video>
+                    <video id="localVideo" autoplay playsinline muted 
+                           style="width: 320px; height: 240px; border-radius: 12px; background: #000;">
+                    </video>
                 </div>
 
             </div>
-         </div>
-    </div>
+        </div>
 
-    <div style="text-align:center; margin-top:20px;">
-        <button id="joinBtn" style="padding: 10px 20px; border-radius: 6px;">Entrar na Chamada</button>
-    </div>
+        <div style="text-align:center; margin-top:20px;">
+            <button id="joinBtn" style="padding: 10px 20px; border-radius: 6px;">Entrar na Chamada</button>
+        </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-    <script src="script.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+        <script src="script.js"></script>
 </body>
 </html>
