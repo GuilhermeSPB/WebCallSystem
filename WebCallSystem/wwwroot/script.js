@@ -18,17 +18,59 @@ const servers = {
 async function start() {
 
     try {
-        if (connection.state != signalR.HubConnectionState.Connected) {
-            await connection.start();
-            localUser = connection.connectionId;
-            var usuarios = await connection.invoke("Registrar");
-            console.log("Usuários já conectados:", usuarios);
-        } else {
-            console.warn("Conexão já iniciada");
-        }
+        await connection.start();
     } catch (e) {
-        console.log("Erro ao iniciar conexão SignalR: ", e);
+        console.error("Erro ao iniciar conexão SignalR: ", e);
     }
+
+    var username;
+
+    $('#usernameModal').modal('show');
+
+    $('#confirmUsername').click(function () {
+
+        const inputName = $('#modalUsername').val().trim();
+
+        if (inputName) {
+            username = inputName;
+            $('#usernameModal').modal('hide');
+            $("#userNameLabel").text(username);
+        } else {
+            alert("Por favor, insira um nome");
+        }
+
+    });
+
+
+    $('#joinBtn').click(async function () {
+
+        try {
+            var listar = await connection.invoke("ListarUsuarios");
+            localUser = connection.connectionId;
+            if (!listar[localUser]) {
+                var usuarios = await connection.invoke("Registrar", username);
+            } else {
+                console.log("Usuario já registrado");
+            }
+        } catch (e) {
+            console.log("Erro tentar registrar ", e);
+        }
+
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById("localVideo").srcObject = localStream;
+
+            await connection.invoke("InciarCall"); // notifica o servidor que entrou
+        } catch (e) {
+            console.error("Erro ao acessar câmera/microfone:", e);
+        }
+
+    });
+
+
+
+
 }
 
 
@@ -164,60 +206,15 @@ function createPeer(userId) {
 
 }
 
+async function criarVideoRemoto(userId) {
+    // evita duplicatas 
+    var usuarios = await connection.invoke("ListarUsuarios");
 
-
-// Evento de clique para entrar na chamada
-$('#joinBtn').click(async function () {
-
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        document.getElementById("localVideo").srcObject = localStream;
-
-        await start(); // inicia a conexão SignalR
-        await connection.invoke("InciarCall"); // notifica o servidor que entrou
-    } catch (e) {
-        console.error("Erro ao acessar câmera/microfone:", e);
-    }
-    
-});
-
-
-function modalShow() {
-    let username = "";
-
-    $('#usernameModal').modal('show');
-
-    $('#confirmUsername').click(function () {
-        const inputName = $('#modalUsername').val().trim();
-
-        if (inputName) {
-            username = inputName;
-            $('#usernameModal').modal('hide');
-
-            //connection.start()
-            //    .then(function () {
-            //        connection.invoke("RegisterUser", username);
-            //    })
-            //    .catch(function (err) {
-            //        console.error(err.toString());
-            //    });
-            $("#userNameLabel").text(username);
-
-        } else {
-            alert("Por favor, insira um nome");
-        }
-
-    });
-}
-
-
-function criarVideoRemoto(userId) {
-    // evita duplicatas
     if ($(`#remoteContainer-${userId}`).length) return;
 
     const $div = $(`
         <div id="remoteContainer-${userId}" style="text-align: center;" <div class="col-xs-12 col-sm-4 text-center">
-            <h3>${userId}</h3>
+            <h3>${usuarios[userId]}</h3>
             <video id="remoteVideo-${userId}" autoplay playsinline muted style="width: 320px; height: 240px; border-radius: 12px; background: #000;">
             </video>
         </div>
@@ -227,5 +224,5 @@ function criarVideoRemoto(userId) {
 }
 
 $(document).ready(function () {
-    modalShow();
+    start();
 });

@@ -29,10 +29,8 @@ namespace WebCallSystem
         public async Task InciarCall()
         {
         var connectionId = Context.ConnectionId;
-        
-        usuarioConectados[connectionId] = connectionId;
 
-            
+  
             await Clients.Others.SendAsync("UsuarioEntrou", connectionId);
 
             
@@ -41,11 +39,9 @@ namespace WebCallSystem
 
         }
 
-        public async Task <Dictionary<string,string>> Registrar()
+        public async void Registrar(string nome)
         {
-            usuarioConectados[Context.ConnectionId] = Context.ConnectionId;
-
-            return usuarioConectados;
+            usuarioConectados[Context.ConnectionId] = nome;
         }
 
         public void Remover()
